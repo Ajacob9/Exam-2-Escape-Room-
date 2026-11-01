@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Night Shift Lockdown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Night-shift unit: deep teal dark, signage teal accent, amber = locked, green = open. Layout: door map on top, one room at a time below. */
+  --bg:#0d171b; --panel:#14232a; --panel-2:#1b2f37; --line:#2a434c;
+  --ink:#e9f1ef; --muted:#9db3b0; --accent:#46c7aa; --lock:#f2b84b; --open:#7ddc8f; --err:#f2836f;
+  --display:"Archivo", "Arial Narrow", Arial, sans-serif;
+  --body:"Atkinson Hyperlegible", Verdana, Arial, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55}
+a{color:var(--accent)}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:900px;margin:0 auto;padding:24px 18px 64px;display:flex;flex-direction:column;gap:22px}
+header.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:16px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:clamp(34px,7vw,58px);font-weight:900;font-stretch:78%;text-transform:uppercase;letter-spacing:.01em}
+.clock{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:15px;color:var(--muted);text-align:right}
+.clock b{display:block;font-size:26px;color:var(--ink)}
+.intro{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.intro p{margin:0;max-width:65ch}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input[type=text]{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:10px 12px;font:inherit;min-width:240px}
+.btn{background:var(--accent);color:#06221b;border:0;border-radius:6px;padding:11px 18px;font-weight:700}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+/* door map */
+.doors{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:640px){.doors{grid-template-columns:repeat(2,1fr)}}
+.door{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;text-align:left;color:var(--ink);display:flex;flex-direction:column;gap:6px;min-height:118px;position:relative}
+.door .num{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.door .nm{font-family:var(--display);font-weight:800;font-stretch:85%;font-size:17px;line-height:1.15}
+.door .st{margin-top:auto;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+.led{width:9px;height:9px;border-radius:50%;background:var(--lock);box-shadow:0 0 8px var(--lock)}
+.door.open .led{background:var(--open);box-shadow:0 0 8px var(--open)}
+.door.open .st{color:var(--open)}
+.door.locked .st{color:var(--lock)}
+.door.current{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.door:disabled{opacity:.5;cursor:not-allowed}
+.digit{font-family:var(--mono);font-weight:700;font-size:22px;position:absolute;right:12px;top:8px;color:var(--open)}
+/* room */
+.room{display:flex;flex-direction:column;gap:18px}
+.room h2{font-size:clamp(26px,4.5vw,36px);font-weight:900;font-stretch:80%;text-transform:uppercase}
+.scenario{background:var(--panel);border-left:4px solid var(--accent);border-radius:0 8px 8px 0;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.scenario p{margin:0;max-width:70ch}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{border-bottom:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.q{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.q.bad{border-color:var(--err)}
+.qhead{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.qnum{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.08em}
+.qtype{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.stem{margin:0;max-width:72ch;font-weight:700}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{display:flex;gap:10px;align-items:flex-start;background:var(--panel-2);border:1px solid transparent;border-radius:6px;padding:10px 12px;cursor:pointer}
+.opt:hover{border-color:var(--line)}
+.opt input{margin-top:5px;accent-color:var(--accent);width:18px;height:18px;flex:none}
+.matrix td.c,.matrix th.c{text-align:center;width:1%;white-space:nowrap}
+.matrix input{accent-color:var(--accent);width:20px;height:20px;cursor:pointer}
+.matrix td:first-child{min-width:220px}
+.hint{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+.hint button{align-self:flex-start;background:none;border:0;color:var(--accent);padding:0;text-decoration:underline;font-size:14px}
+.hint .src{background:var(--bg);border:1px dashed var(--line);border-radius:6px;padding:8px 10px;color:var(--ink)}
+.flag{font-size:14px;color:var(--err);font-weight:700}
+.lockbar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding:18px 0 8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.msg{font-weight:700}
+.msg.no{color:var(--err)} .msg.yes{color:var(--open)}
+/* final */
+.keypad{display:flex;gap:10px}
+.keypad input{width:56px;height:68px;text-align:center;font-family:var(--mono);font-size:30px;font-weight:700;background:var(--bg);color:var(--ink);border:2px solid var(--lock);border-radius:8px}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:640px){.summary{grid-template-columns:repeat(2,1fr)}}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px}
+.tile b{display:block;font-family:var(--mono);font-size:26px;font-variant-numeric:tabular-nums}
+.tile span{font-size:13px;color:var(--muted)}
+.debrief{display:flex;flex-direction:column;gap:14px}
+.dq{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.dq p{margin:0;max-width:75ch}
+.pill{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:99px;border:1px solid}
+.pill.ok{color:var(--open);border-color:var(--open)} .pill.re{color:var(--lock);border-color:var(--lock)}
+.ans{color:var(--open);font-weight:700}
+.where{font-size:15px;color:var(--muted)}
+.where b{color:var(--ink)}
+.hidden{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (prefers-reduced-motion:no-preference){
+  .door.justopen{animation:pop .7s ease}
+  @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.04)}100%{transform:scale(1)}}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">VL-BSN 154 · Exam 2 prep · Modules 4–7</div>
+      <h1>Night Shift Lockdown</h1>
+    </div>
+    <div class="clock" aria-live="off">Time on the unit<b id="clock">00:00</b></div>
+  </header>
+
+  <section class="intro" id="intro">
+    <p><b>It is 0300. The unit’s badge system has locked down.</b> Four doors stand between your team and the exit. Each door opens only when every answer in that room is correct. When a door opens, it shows one digit of the exit code.</p>
+    <p>If the lock stays shut, the panel marks which questions to recheck, but it will not tell you the answer. Stuck? Each question has a <b>Where to look</b> clue that points you to the slides or reading. Rationales for every question unlock after you escape.</p>
+    <p>These questions use new situations on purpose. They are harder than Exam 2, so you must recall each concept and apply it, not just recognize it.</p>
+    <div class="row">
+      <label for="team" class="sr">Team or student name</label>
+      <input type="text" id="team" placeholder="Team or student name" autocomplete="off">
+      <button class="btn" id="startBtn">Start the shift</button>
+    </div>
+  </section>
+
+  <nav class="doors hidden" id="doors" aria-label="Doors"></nav>
+  <main id="stage"></main>
+</div>
+
+<script>
+const ROOMS = [
+{ id:"r1", name:"Charge Nurse Station", topic:"Scope, delegation and accountability", digit:"4",
+  scenario:`<p><b>Harbor View Long-Term Care.</b> It is night shift in Washington. Priya is the only RN for 40 residents. She works with Tom, an LPN who was a Navy corpsman for 6 years and has held his LPN license for 1 year. Lena and Raj are nursing assistants (NACs). Lena was hired yesterday.</p>
+  <div class="tbl"><table><tr><th>Resident</th><th>Status tonight</th></tr>
+  <tr><td>Mrs. Ellis, 88</td><td>Stable; scheduled oral medicines; needs turning every 2 hours; uses a mechanical lift</td></tr>
+  <tr><td>Mr. Burke, 79</td><td>Admitted 1 hour ago after hip surgery; new oxycodone order; not yet assessed by an RN</td></tr>
+  <tr><td>Mrs. Diaz, 92</td><td>At baseline yesterday; tonight she began coughing with every sip and is “not acting right”</td></tr>
+  <tr><td>Mr. Fong, 84</td><td>Stable; diabetes; blood sugar checks before meals</td></tr></table></div>`,
+  qs:[
+  { type:"matrix", stem:"Each of Priya’s decisions breaks one right of delegation. For each decision, choose the right that is broken.",
+    rowHead:"Priya’s decision", cols:["Task","Circumstance","Person","Direction","Supervision"],
+    rows:[["Asks Lena to turn Mrs. Ellis every 2 hours, then never checks back during the 8-hour shift",4],["Asks Tom to do Mr. Burke’s admission assessment and write his care plan",0],["Asks Raj to take Mr. Burke’s vital signs and “let me know if anything looks off”",3],["Asks Raj to feed Mrs. Diaz her dinner",1],["Asks Lena to move Mrs. Ellis with the mechanical lift; Lena has not been trained on it",2]],
+    rationale:"Right task: admission assessment and care planning belong to the RN and cannot be delegated. Right circumstance: Mrs. Diaz has a new swallowing problem, so she is not stable enough for routine feeding by a NAC. Right person: a worker must be trained for the task. Right direction: clear directions say what to measure, when, and which values to report. Right supervision: the RN must follow up on delegated work.",
+    source:"Scope & Delegation slides: “The five rights of delegation” (Slide 21) and Slides 22–24. ANA & NCSBN (2019), National Guidelines for Nursing Delegation."},
+  { type:"sata", stem:"Tom says, “In the Navy I gave IV push medicines and sutured wounds on my own. Here I feel like I can’t do anything.” Which statements by Priya correctly explain how his practice is regulated? Select all that apply.",
+    options:["“Your scope comes from your Washington LPN license, not from your past training.”","“Our facility’s policy can limit what you do, even when state law allows it.”","“If I stay in the room and watch, you can do anything you were trained to do.”","“The Board of Nursing can discipline your license if you practice outside your scope.”","“Accreditation standards set what an LPN may do in Washington.”","“The Joint Commission can suspend your license if you make an error.”"], correct:[0,1,3],
+    rationale:"Correct: military authority ends with military service, and the civilian license sets scope. Correct: employer policy can narrow practice but never widen it. Not correct: RN supervision does not expand anyone’s scope. Correct: the Board of Nursing licenses and disciplines nurses. Not correct: state law (the Nurse Practice Act, RCW 18.79) sets scope, not accreditation. Not correct: The Joint Commission accredits facilities; it does not hold nursing licenses.",
+    source:"Scope & Delegation slides: “Six layers that govern every nurse” (Slide 6), “Military healthcare: two training models” (Slide 15), and “LPN scope in Washington” (Slide 17). RCW 18.79."},
+  { type:"mc", stem:"Tom charts this about Mrs. Diaz: “T 37.9°C, HR 102, BP 108/62. Refused fluids. Will recheck in AM.” Which feedback from Priya best reflects the nursing model and her own accountability?",
+    options:["“Good job getting a full set of vital signs. That completes your assessment for tonight.”","“This is a change from her baseline, so tell me now. Also ask her daughter what seems different to her.”","“Rechecking in the morning is fine, because many residents her age are tired at night.”","“Ask Raj to push fluids, and chart that she refused.”"], correct:[1],
+    rationale:"New fever, fast heart rate and a swallowing change are a change in condition that the RN must assess. The nursing model looks at the whole person, including the family’s knowledge of her baseline. Vital signs alone are the medical-model view. Waiting until morning delays care. Pushing fluids is unsafe with a new swallowing problem.",
+    source:"Scope & Delegation slides: “Military healthcare: two training models” (Slide 15), “Independent, interdependent, dependent” (Slide 13), and “Who is responsible for the nursing care?” (Slide 24)."},
+  { type:"mc", stem:"Which situation is an example of direct supervision?",
+    options:["The RN is across town, and the nursing assistant reaches her by phone in 1 minute","The RN stands in the room and watches the LPN give an injection","The RN left written instructions yesterday and will review the chart tomorrow","The RN is in the building, can come quickly, and assessed the client before delegating"], correct:[3],
+    rationale:"Direct supervision means the RN is on site, quickly available, and has assessed the client. Being off site is indirect supervision, even if the RN answers the phone quickly. Being in the room and watching is immediate supervision. Written instructions with no RN on site is indirect supervision.",
+    source:"Scope & Delegation slides: “Three levels of supervision” (Slide 19). WAC 246-840-010."}
+  ]},
+{ id:"r2", name:"Family Clinic", topic:"Lifespan development", digit:"7",
+  scenario:`<p><b>Kitsap Family Clinic.</b> A clinic nurse sees four clients today.</p>
+  <div class="tbl"><table><tr><th>Client</th><th>Age</th><th>What the nurse learns</th></tr>
+  <tr><td>Ava</td><td>2½ years</td><td>Is potty training; her attention is on holding in and letting go, and she proudly announces each success</td></tr>
+  <tr><td>Eli</td><td>7 years</td><td>Has asthma; says, “I follow the rules so I don’t get in trouble”; understands a medicine dose is the same in a tall cup or a short cup</td></tr>
+  <tr><td>Sofia</td><td>16 years</td><td>Pregnant; says, “I used to believe everything my church taught. Now I’m not sure what I believe”</td></tr>
+  <tr><td>Walter</td><td>70 years</td><td>Retired 6 months ago; his wife has a chronic illness; volunteers at a food bank</td></tr></table></div>`,
+  qs:[
+  { type:"matrix", stem:"For each finding, choose the theorist whose ideas best explain it.",
+    rowHead:"Finding", cols:["Freud","Erikson","Piaget","Kohlberg","Havighurst"],
+    rows:[["Eli knows the dose is the same in a tall or short cup",2],["Walter is adjusting to retirement and to his wife’s illness",4],["Ava’s attention is on holding in and letting go during potty training",0],["Sofia is working out who she is and what she values",1],["Eli follows rules to avoid punishment",3]],
+    rationale:"Freud: in the anal stage (about 1–3 years), pleasure and conflict center on toilet training and holding in or letting go. Kohlberg: the preconventional level is about avoiding punishment. Piaget: knowing that an amount stays the same when its shape changes is conservation (concrete operational). Erikson: identity vs. role confusion is the teen task. Havighurst: the tasks society expects at each age, such as adjusting to retirement and a spouse’s health.",
+    source:"Growth & Development slides: “Developmental theorists” (Slide 8) and Slides 9–15. Cowen et al. (2022), pp. 56–59. Theorist readings: Freud (Iowa State Digital Press), Kohlberg (Baylor OpenBooks), Havighurst (Prestige Journal of Education)."},
+  { type:"mc", stem:"Sofia’s statement about her beliefs is best interpreted as:",
+    options:["Spiritual distress that needs a chaplain referral today","Role confusion, because she no longer knows what she believes","A normal step in faith development as she examines her own beliefs","A sign of depression, because she has lost interest in church"], correct:[2],
+    rationale:"In Fowler’s theory, teens move from accepting the beliefs of their group toward examining beliefs for themselves. Questioning fits Erikson’s identity exploration. Questioning alone is not spiritual distress; the nurse assesses first. Role confusion means no stable sense of self or direction, not healthy questioning. Nothing in her statement shows depression.",
+    source:"Growth & Development slides: Fowler (Slides 15–16) and “Erikson” (Slide 10). Fowler reading (EBSCO, through the OC library)."},
+  { type:"sata", stem:"The nurse teaches inhaler use to clients of different ages. Which plans match the client’s development? Select all that apply.",
+    options:["Ava: let her choose the color of her spacer mask, and let her hold it and watch her parent use it on a stuffed animal first","Eli: show each step with a real inhaler, and give him a simple picture checklist","Eli: explain how airway swelling causes wheezing, and have him weigh treatment options","Sofia: talk with her alone about how asthma could affect her pregnancy and her plans","Walter: have his wife manage his inhaler, because older adults forget","Ava: give her a written handout to keep in her room"], correct:[0,1,3],
+    rationale:"Correct: toddlers need simple choices, a chance to handle equipment, and an adult who models the steps (autonomy; preoperational). Correct: school-age children learn best with real objects and concrete steps. Not correct: abstract cause and effect and weighing options fit teens (formal operations), not a 7-year-old. Correct: teens need privacy and plans that fit their own goals. Not correct: assuming an older adult cannot learn is ageism. Not correct: a 2-year-old cannot read a handout.",
+    source:"Growth & Development slides: “Piaget: how thinking matures” (Slide 11), “Teens: explain the why and share decisions” (Slide 12), “Toddler and preschooler” (Slide 21), and “Adolescent: who am I?” (Slide 25)."},
+  { type:"mc", stem:"Walter says, “Since I retired, I wasn’t sure what I was for. Now I help at the food bank, and I’m teaching my grandson to fish. I want to leave something good behind.” Which conclusion is most accurate?",
+    options:["He is adapting well and finding new roles that give his life meaning","He is in despair and needs a depression screening today","He is regressing to an earlier stage because of stress","He is at Kohlberg’s preconventional level because he focuses on rewards"], correct:[0],
+    rationale:"Adjusting to retirement and finding new roles are expected tasks of later adulthood (Havighurst). Mentoring and wanting to leave a legacy point toward ego integrity. There are no cues of despair or depression, no cues of regression, and nothing suggests reasoning based on rewards.",
+    source:"Growth & Development slides: “Erikson” (Slide 10, ego integrity vs. despair). Havighurst reading (Prestige Journal of Education)."}
+  ]},
+{ id:"r3", name:"Communication Hub", topic:"Communication and teamwork", digit:"2",
+  scenario:`<p><b>Bayview Clinic.</b> Jamal is an RN at a busy primary care clinic. He calls providers about urgent problems, coaches clients on health habits, and hands off clients to the next nurse at shift change.</p>`,
+  qs:[
+  { type:"mc", stem:"Jamal calls the provider: “This is Jamal at Bayview Clinic about Mrs. Lin, 62. Her BP is 188/112, and she has a headache. She has diabetes and ran out of her lisinopril 4 days ago. What do you want me to do?” Which part of SBAR does Jamal most need to strengthen?",
+    options:["Situation, because he did not say who he is or where he works","Background, because he left out her history","Assessment and Recommendation, because he gave no concern and no clear request","None, because the report is complete"], correct:[2],
+    rationale:"Jamal never says what he thinks is happening, and he asks the provider what to do instead of making a clear request, such as “I think she needs to be seen today.” He did give his name, his clinic and the problem (Situation), and her diabetes and missed medicine (Background).",
+    source:"Communication slides: “TeamSTEPPS Communication Tools” (Slide 15, SBAR) and Slide 16. AHRQ TeamSTEPPS (2023)."},
+  { type:"matrix", stem:"Jamal uses motivational interviewing with a client who smokes. For each statement, choose the OARS skill it shows.",
+    rowHead:"Jamal’s statement", cols:["Open question","Affirmation","Reflection","Summary","Not OARS"],
+    rows:[["“You cut down from a pack a day to half a pack. That took real effort.”",1],["“You need to quit now, before you get cancer.”",4],["“So far you want to quit for your kids, and stress is the hardest part. Did I get that right?”",3],["“What would make quitting worth it for you?”",0],["“Part of you wants to quit, and part of you worries about handling stress.”",2]],
+    rationale:"Open questions invite the client to talk. Affirmations name real strengths or efforts. Reflections repeat the client’s meaning, including mixed feelings. Summaries pull several points together and check accuracy. Telling and warning are not motivational interviewing.",
+    source:"Communication slides: “Communication in Plans of Care” (Slide 26, OARS) and “Therapeutic vs. Nontherapeutic” (Slide 10)."},
+  { type:"sata", stem:"Which actions by nurses cross a professional boundary or put client privacy at risk? Select all that apply.",
+    options:["Posting a photo of the team party in which a client’s chart can be seen on a computer screen","Accepting a friend request on social media from a client after the client’s last visit","Telling a client, “I can’t give you my personal number, but here is the clinic’s after-hours line”","Posting, without a name, “Sad day. A 62-year-old teacher at our Bremerton clinic had a stroke”","Using a qualified interpreter to explain a new diagnosis","Sharing a funny story about a client with a coworker in a public elevator"], correct:[0,1,3,5],
+    rationale:"Correct: a visible chart is a privacy breach. Correct: online friendships with clients, even after care ends, blur the professional relationship. Not correct: giving the clinic line keeps a boundary and still meets the client’s need. Correct: age, job, place and condition can identify a client even without a name. Not correct: a qualified interpreter protects accurate, private communication. Correct: talking about clients in public risks privacy and disrespects the client.",
+    source:"Communication slides: “Social Media and Digital Communication” (Slide 23) and “Language Barriers and Patient Safety” (Slide 20). NCSBN (2018), A Nurse’s Guide to the Use of Social Media."},
+  { type:"mc", stem:"A new graduate says, “SBAR, CUS and I-PASS are basically the same thing.” Which response best explains how they differ?",
+    options:["“SBAR is for written notes, CUS is for talking with families, and I-PASS is for talking with providers.”","“They are the same tool, but I-PASS is only used on pediatric units.”","“SBAR is for emergencies, CUS is for concerns that are not urgent, and I-PASS is for discharge teaching.”","“SBAR organizes a report to a provider, CUS escalates a safety concern, and I-PASS structures a handoff between caregivers.”"], correct:[3],
+    rationale:"Each TeamSTEPPS tool has its own job: SBAR for an organized report and request, CUS (Concerned, Uncomfortable, Safety issue) for speaking up when a safety concern is not heard, and I-PASS for complete handoffs that end with the receiver’s synthesis. CUS is for urgent safety concerns, and I-PASS is used across settings for handoffs, not discharge teaching.",
+    source:"Communication slides: “TeamSTEPPS Communication Tools” (Slide 15), “Handoffs Save Lives: The I-PASS Study” (Slide 17), and “Speaking Up: Tools Aren’t Enough” (Slide 18). Starmer et al. (2014)."}
+  ]},
+{ id:"r4", name:"Community Office", topic:"Social determinants of health and prevention", digit:"9",
+  scenario:`<p><b>The Westside neighborhood.</b> A community health nurse joins a team working in Westside. Here is what changed in the past year.</p>
+  <div class="tbl"><table><tr><th>Area</th><th>Change</th></tr>
+  <tr><td>Jobs</td><td>The largest employer closed; many adults now work 2 part-time jobs with no benefits</td></tr>
+  <tr><td>Food</td><td>The only full-service grocery store closed; a dollar store remains</td></tr>
+  <tr><td>Transportation</td><td>The city cut the bus route to the clinic and the hospital</td></tr>
+  <tr><td>Health</td><td>ED visits for uncontrolled diabetes and high blood pressure rose 30%</td></tr>
+  <tr><td>School</td><td>Teachers report more children arriving at school hungry</td></tr></table></div>`,
+  qs:[
+  { type:"matrix", stem:"For each action, choose the level of prevention.",
+    rowHead:"Action", cols:["Primary","Secondary","Tertiary"],
+    rows:[["Free blood pressure checks at the dollar store",1],["Cardiac rehab for a resident after a heart attack",2],["A free breakfast program at the elementary school",0],["Asking every clinic client about food insecurity",1],["Foot care for residents with diabetic nerve damage",2],["A walking group for healthy adults at the community center",0]],
+    rationale:"Primary prevention stops a problem before it starts (breakfast program, walking group). Secondary prevention finds a problem early, usually through screening (blood pressure checks, food insecurity screening). Tertiary prevention limits harm from a problem that already exists (cardiac rehab, diabetic foot care).",
+    source:"SDOH slides: “Neuman, the Continuum, and Levels of Prevention” (Slide 23). Nursing Health Promotion, Ch. 2 (2.1–2.8)."},
+  { type:"mc", stem:"Which explanation best accounts for the 30% rise in ED visits for diabetes and high blood pressure?",
+    options:["Residents stopped caring about their health after the closure","Ongoing money and job stress keeps the stress response active, and food and transportation barriers limit healthy choices","The neighborhood population is aging, and chronic disease rises with age","Residents do not know enough about diet and exercise"], correct:[1],
+    rationale:"Chronic stress raises allostatic load, which moves people toward illness on the health-illness continuum. Losing the grocery store and bus route also limits what people can do, whatever they know. Blaming motivation ignores the conditions people live in. Aging cannot explain a jump this large in 1 year. Knowledge does not help when food and transportation are out of reach.",
+    source:"SDOH slides: “SDOH, Stress, and Adaptation” (Slide 22), Slide 9 and Slide 5."},
+  { type:"sata", stem:"Which items are structural determinants of health? Select all that apply.",
+    options:["The city council’s decision to cut the bus route","A state law that sets the minimum wage","A family that runs out of food before payday","Zoning rules that make it hard to open a grocery store in Westside","A resident who lives alone and has no one to call","A child who comes to school hungry"], correct:[0,1,3],
+    rationale:"Correct: a council funding decision is a policy that decides who gets resources. Correct: a wage law is a structural determinant. Not correct: running out of food is a social condition that results from structures. Correct: zoning rules are policies. Not correct: living alone is a social condition (Social and Community Context). Not correct: a hungry child is a social condition that results from structures.",
+    source:"SDOH slides: “Structural vs. Social Determinants” (Slide 6). OpenStax (2025), section 8.4."},
+  { type:"mc", stem:"The team can fund only one project this year. Which project is most likely to improve health for the most residents over time?",
+    options:["Partner with the city to restore the bus route to a full-service grocery store and the clinic","Hire an extra ED nurse to manage diabetes and blood pressure emergencies","Give every clinic client a pamphlet on healthy eating","Refer families to a food bank one at a time when they ask for help"], correct:[0],
+    rationale:"Upstream action changes the system that shapes everyone’s choices, so it reaches the most people over time. Restoring transit improves access to food and to care at once. ED staffing is downstream; it responds after illness happens. Pamphlets are downstream and do not remove the barriers. Food bank referrals are midstream; they help one family at a time.",
+    source:"SDOH slides: “Upstream, Midstream, Downstream” (Slide 7) and Slide 6. HHS ASPE (2024)."}
+  ]}
+];
+const CODE = ROOMS.map(r=>r.digit).join("");
+const TYPE_LABEL = {mc:"Multiple choice", sata:"Select all that apply", matrix:"Matrix: one answer per row"};
+
+let S = null;
+function fresh(){ return {team:"", started:null, finished:null, current:0, open:[false,false,false,false], attempts:[0,0,0,0], hints:{}, firstTry:{}, answers:{}, bad:{}, escaped:false, msg:""}; }
+function qid(r,i){ return r+"-"+i; }
+function qnumber(ri,qi){ return ri*4+qi+1; }
+
+function boot(data){
+  S = (data && data.started) ? data : fresh();
+  if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(()=>S);
+  document.getElementById("startBtn").onclick = start;
+  document.getElementById("team").addEventListener("keydown", e=>{ if(e.key==="Enter") start(); });
+  if (S.started) { document.getElementById("intro").classList.add("hidden"); render(); }
+  setInterval(tick, 1000); tick();
+}
+function start(){
+  S.team = document.getElementById("team").value.trim() || "Your team";
+  S.started = Date.now();
+  document.getElementById("intro").classList.add("hidden");
+  render();
+}
+function elapsed(){ if(!S.started) return 0; return Math.floor(((S.finished||Date.now()) - S.started)/1000); }
+function fmt(s){ const m=Math.floor(s/60), x=s%60; return String(m).padStart(2,"0")+":"+String(x).padStart(2,"0"); }
+function tick(){ document.getElementById("clock").textContent = fmt(elapsed()); }
+
+function render(){
+  renderDoors();
+  const st = document.getElementById("stage");
+  if (S.escaped) { st.innerHTML = debriefHTML(); bindDebrief(); return; }
+  if (S.current===4 && S.open.every(Boolean)) { st.innerHTML = exitHTML(); bindExit(); return; }
+  st.innerHTML = roomHTML(S.current); bindRoom(S.current);
+}
+function renderDoors(){
+  const d = document.getElementById("doors"); d.classList.remove("hidden");
+  d.innerHTML = ROOMS.map((r,i)=>{
+    const unlockedToVisit = i===0 || S.open[i-1] || S.open[i];
+    const cls = ["door", S.open[i]?"open":"locked", (i===S.current && !S.open.every(Boolean))?"current":""].join(" ");
+    return `<button class="${cls}" data-door="${i}" ${unlockedToVisit?"":"disabled"} aria-label="Door ${i+1}, ${r.name}, ${S.open[i]?"open":"locked"}">
+      <span class="num">DOOR ${i+1} · Q${i*4+1}–${i*4+4}</span>
+      <span class="nm">${r.name}</span>
+      ${S.open[i]?`<span class="digit">${r.digit}</span>`:""}
+      <span class="st"><span class="led"></span>${S.open[i]?"Open":(unlockedToVisit?"Locked":"Sealed")}</span>
+    </button>`;}).join("");
+  d.querySelectorAll("[data-door]").forEach(b=>b.onclick=()=>{ S.current=+b.dataset.door; S.msg=""; render(); window.scrollTo({top:0}); });
+}
+
+function qHTML(ri,qi,q){
+  const id = qid(ri,qi), a = S.answers[id];
+  let body = "";
+  if (q.type==="mc"||q.type==="sata"){
+    const t = q.type==="mc"?"radio":"checkbox";
+    body = `<div class="opts" role="group" aria-label="Choices">`+q.options.map((o,k)=>{
+      const on = q.type==="mc" ? a===k : (Array.isArray(a)&&a.includes(k));
+      return `<label class="opt"><input type="${t}" name="${id}" value="${k}" ${on?"checked":""} ${S.open[ri]?"disabled":""}><span><b>${String.fromCharCode(65+k)}.</b> ${o}</span></label>`;}).join("")+`</div>`;
+  } else {
+    body = `<div class="tbl"><table class="matrix"><tr><th>${q.rowHead}</th>${q.cols.map(c=>`<th class="c">${c}</th>`).join("")}</tr>`+
+      q.rows.map((r,ri2)=>`<tr><td>${r[0]}</td>${q.cols.map((c,ci)=>`<td class="c"><input type="radio" name="${id}-${ri2}" value="${ci}" aria-label="${c}" ${(a&&a[ri2]===ci)?"checked":""} ${S.open[ri]?"disabled":""}></td>`).join("")}</tr>`).join("")+`</table></div>`;
+  }
+  const hinted = S.hints[id];
+  return `<article class="q ${S.bad[id]?"bad":""}" id="q-${id}">
+    <div class="qhead"><span class="qnum">QUESTION ${qnumber(ri,qi)}</span><span class="qtype">${TYPE_LABEL[q.type]}</span></div>
+    <p class="stem">${q.stem}</p>${body}
+    ${S.bad[id]?`<div class="flag">Recheck this one.</div>`:""}
+    <div class="hint">${hinted?`<div class="src"><b>Where to look:</b> ${q.source}</div>`:`<button data-hint="${id}">Where to look</button>`}</div>
+  </article>`;
+}
+function roomHTML(ri){
+  const r = ROOMS[ri];
+  return `<section class="room">
+    <div><div class="eyebrow">Door ${ri+1} of 4 · ${r.topic}</div><h2>${r.name}</h2></div>
+    <div class="scenario">${r.scenario}</div>
+    ${r.qs.map((q,qi)=>qHTML(ri,qi,q)).join("")}
+    <div class="lockbar">
+      ${S.open[ri]
+        ? `<span class="msg yes">Door open. Your digit is ${r.digit}.</span>${ri<3?`<button class="btn" id="nextBtn">Go to Door ${ri+2}</button>`:`<button class="btn" id="nextBtn">Go to the exit</button>`}`
+        : `<button class="btn" id="tryBtn">Try the lock</button><span class="msg ${S.msg?"no":""}" aria-live="polite">${S.msg||""}</span>`}
+    </div></section>`;
+}
+function collect(ri){
+  const r = ROOMS[ri];
+  r.qs.forEach((q,qi)=>{
+    const id = qid(ri,qi);
+    if (q.type==="mc"){ const el=document.querySelector(`input[name="${id}"]:checked`); S.answers[id]= el? +el.value : undefined; }
+    else if (q.type==="sata"){ S.answers[id]=[...document.querySelectorAll(`input[name="${id}"]:checked`)].map(e=>+e.value); }
+    else { S.answers[id]=q.rows.map((_,k)=>{ const el=document.querySelector(`input[name="${id}-${k}"]:checked`); return el? +el.value : undefined; }); }
+  });
+}
+function isRight(q,a){
+  if (q.type==="mc") return a===q.correct[0];
+  if (q.type==="sata") return Array.isArray(a) && a.length===q.correct.length && q.correct.every(c=>a.includes(c));
+  return Array.isArray(a) && q.rows.every((r,k)=>a[k]===r[1]);
+}
+function bindRoom(ri){
+  document.querySelectorAll("[data-hint]").forEach(b=>b.onclick=()=>{ collect(ri); S.hints[b.dataset.hint]=true; render(); document.getElementById("q-"+b.dataset.hint).scrollIntoView({block:"center"}); });
+  document.querySelectorAll(".room input").forEach(i=>i.addEventListener("change",()=>collect(ri)));
+  const t = document.getElementById("tryBtn");
+  if (t) t.onclick = ()=>{
+    collect(ri);
+    const r = ROOMS[ri];
+    const unanswered = r.qs.some((q,qi)=>{ const a=S.answers[qid(ri,qi)]; return a===undefined || (Array.isArray(a)&&(q.type==="sata"?a.length===0:a.some(x=>x===undefined))); });
+    if (unanswered){ S.msg="Answer every question (and every matrix row) before you try the lock."; render(); return; }
+    S.attempts[ri]++;
+    let right=0;
+    r.qs.forEach((q,qi)=>{ const id=qid(ri,qi), ok=isRight(q,S.answers[id]);
+      if (S.firstTry[id]===undefined) S.firstTry[id]=ok;
+      S.bad[id]=!ok; if(ok) right++; });
+    if (right===r.qs.length){ S.open[ri]=true; S.msg=""; render();
+      const d=document.querySelector(`[data-door="${ri}"]`); if(d) d.classList.add("justopen"); }
+    else { S.msg=`The lock stays shut. ${right} of ${r.qs.length} answers are correct. Recheck the questions marked in red.`; render(); }
+  };
+  const n = document.getElementById("nextBtn");
+  if (n) n.onclick = ()=>{ S.current=ri+1; S.msg=""; render(); window.scrollTo({top:0}); };
+}
+
+function exitHTML(){
+  return `<section class="room">
+    <div><div class="eyebrow">Final lock</div><h2>The exit door</h2></div>
+    <div class="scenario"><p>All four doors are open. Enter the exit code: the digits from Doors 1, 2, 3 and 4, in order.</p></div>
+    <div class="keypad">${[0,1,2,3].map(i=>`<input inputmode="numeric" maxlength="1" id="k${i}" aria-label="Digit ${i+1}">`).join("")}</div>
+    <div class="row"><button class="btn" id="exitBtn">Unlock the exit</button><span class="msg ${S.msg?"no":""}" aria-live="polite">${S.msg||""}</span></div>
+  </section>`;
+}
+function bindExit(){
+  const ks=[0,1,2,3].map(i=>document.getElementById("k"+i));
+  ks.forEach((k,i)=>k.addEventListener("input",()=>{ k.value=k.value.replace(/\D/g,""); if(k.value&&i<3) ks[i+1].focus(); }));
+  ks[0].focus();
+  document.getElementById("exitBtn").onclick=()=>{
+    if (ks.map(k=>k.value).join("")===CODE){ S.escaped=true; S.finished=Date.now(); S.msg=""; render(); window.scrollTo({top:0}); }
+    else { S.msg="That code does not open the exit. Check the digit on each door."; render(); }
+  };
+}
+
+function answerText(q){
+  if (q.type==="matrix") return q.rows.map(r=>`${r[0]} → ${q.cols[r[1]]}`).join("<br>");
+  return q.correct.map(c=>String.fromCharCode(65+c)+". "+q.options[c]).join("<br>");
+}
+function debriefHTML(){
+  const total=16, first=Object.values(S.firstTry).filter(Boolean).length, hints=Object.keys(S.hints).length, tries=S.attempts.reduce((a,b)=>a+b,0);
+  const rows = ROOMS.map((r,ri)=>`<h3 style="font-size:22px;font-stretch:85%;text-transform:uppercase;margin-top:10px">Door ${ri+1}: ${r.name} <span class="qtype">· ${r.topic}</span></h3>`+
+    r.qs.map((q,qi)=>{ const id=qid(ri,qi), ok=S.firstTry[id];
+      return `<article class="dq">
+        <div class="qhead"><span class="qnum">QUESTION ${qnumber(ri,qi)}</span><span class="pill ${ok?"ok":"re"}">${ok?"Right on first try":"Needed a retry"}</span></div>
+        <p class="stem">${q.stem}</p>
+        <p class="ans">${answerText(q)}</p>
+        <p><b>Rationale:</b> ${q.rationale}</p>
+        <p class="where"><b>Where to find it:</b> ${q.source}</p>
+      </article>`;}).join("")).join("");
+  return `<section class="room debrief">
+    <div><div class="eyebrow">Escaped · ${esc(S.team)}</div><h2>You made it off the unit</h2></div>
+    <div class="summary">
+      <div class="tile"><b>${fmt(elapsed())}</b><span>Total time</span></div>
+      <div class="tile"><b>${first}/${total}</b><span>Right on first try</span></div>
+      <div class="tile"><b>${tries}</b><span>Lock attempts</span></div>
+      <div class="tile"><b>${hints}</b><span>“Where to look” clues used</span></div>
+    </div>
+    <p style="margin:0;max-width:70ch">Review every rationale below, especially the questions marked <span class="pill re">Needed a retry</span>. Go back to the slide or reading listed for each one before Exam 2.</p>
+    <div class="row"><button class="btn" id="copyBtn">Copy my results</button><button class="btn ghost" id="againBtn">Play again</button><span class="msg yes" id="copyMsg" aria-live="polite"></span></div>
+    ${rows}
+  </section>`;
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function bindDebrief(){
+  document.getElementById("copyBtn").onclick=async()=>{
+    const missed=[]; ROOMS.forEach((r,ri)=>r.qs.forEach((q,qi)=>{ if(!S.firstTry[qid(ri,qi)]) missed.push(qnumber(ri,qi)); }));
+    const txt=`Night Shift Lockdown (VL-BSN 154 Exam 2 prep)\nTeam: ${S.team}\nTime: ${fmt(elapsed())}\nRight on first try: ${Object.values(S.firstTry).filter(Boolean).length}/16\nLock attempts: ${S.attempts.join(", ")} (Doors 1–4)\nClues used: ${Object.keys(S.hints).length}\nQuestions to review: ${missed.length?missed.join(", "):"none"}`;
+    const m=document.getElementById("copyMsg");
+    try{ await navigator.clipboard.writeText(txt); m.textContent="Copied. Paste it wherever your instructor asks."; }
+    catch(e){ m.textContent="Copy did not work here. Take a screenshot of this summary instead."; }
+  };
+  document.getElementById("againBtn").onclick=()=>{ S=fresh(); document.getElementById("intro").classList.remove("hidden"); document.getElementById("doors").classList.add("hidden"); document.getElementById("stage").innerHTML=""; window.scrollTo({top:0}); };
+}
+
+(window.claude && window.claude.hot && window.claude.hot.ready) ? window.claude.hot.ready(boot) : boot((window.claude && window.claude.hot && window.claude.hot.data) || {});
+</script>
+</body>
+</html>
